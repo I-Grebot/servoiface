@@ -1,4 +1,4 @@
-# elec_servoiface
+# servoiface
 DC Servo motor interface
 
 Board use to control a DC motor and act as a servomotor, based on STM32F042 MCU. 
