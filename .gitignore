@@ -1,0 +1,68 @@
+##############
+##    DOC   ##
+##############
+
+doc/datasheets/*
+
+##############
+##   ELEC   ##
+##############
+
+# Backup files
+*.s#?
+*.b#?
+*.l#?
+
+eagle.epf
+
+# Autorouter files
+*.pro
+*.job
+
+# CAM files
+*.$$$
+*.cmp
+*.ly2
+*.l15
+*.sol
+*.plc
+*.stc
+*.sts
+*.crc
+*.crs
+
+*.dri
+*.drl
+*.gpi
+*.pls
+
+*.drd
+*.drd.*
+
+*.info
+
+*.eps
+
+# file locks introduced since 7.x
+*.lck
+
+##############
+## FIRMWARE ##
+##############
+
+# Build directories
+firm/cubemx/TrueSTUDIO/ServoIface/Debug/
+firm/cubemx/TrueSTUDIO/ServoIface/Release/
+
+# Object files / Binaries
+*.o
+*.ko
+*.obj
+*.elf
+*.elf.launch
+*.elf.hex
+*.elf.map
+*.elf.list
+*.map
+*.hex
+
