@@ -65,6 +65,7 @@ osSemaphoreId selfTestSemHandle;
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
 int pwm=0;
+int16_t encoder_counter=0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -122,6 +123,11 @@ int main(void)
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
    TIM3->CCR1 = 300;
    TIM3->CCR2 = 0;
+
+  HAL_TIM_Encoder_Start(&htim2,TIM_CHANNEL_1);
+
+
+
   /* USER CODE END 2 */
 
   /* USER CODE BEGIN RTOS_MUTEX */
@@ -173,7 +179,7 @@ int main(void)
   while (1)
   {
   /* USER CODE END WHILE */
-
+	  encoder_counter = TIM2->CNT;
   /* USER CODE BEGIN 3 */
 
   }
@@ -453,7 +459,7 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : ENDSTOP_1_Pin */
   GPIO_InitStruct.Pin = ENDSTOP_1_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(ENDSTOP_1_GPIO_Port, &GPIO_InitStruct);
 
@@ -463,6 +469,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI0_1_IRQn, 3, 0);
+  HAL_NVIC_EnableIRQ(EXTI0_1_IRQn);
 
 }
 
@@ -478,6 +488,16 @@ void MotorCtrlTask(void const * argument)
   /* Infinite loop */
   for(;;)
   {
+	  //encoder_counter = TIM_GetCounter(TIM2) ;
+	  encoder_counter = TIM2->CNT;
+//	if(HAL_GPIO_ReadPin(ENDSTOP_1_GPIO_Port, ENDSTOP_1_Pin))
+//	{
+//		TIM3->CCR1 = 300;
+//	}
+//	else {
+//		TIM3->CCR1 = 600;
+//	}
+
     osDelay(1);
   }
   /* USER CODE END 5 */ 
@@ -526,6 +546,27 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 /* USER CODE BEGIN Callback 1 */
 
 /* USER CODE END Callback 1 */
+}
+
+__weak void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	/* Prevent unused argument(s) compilation warning */
+	UNUSED(GPIO_Pin);
+
+	/* NOTE: This function should not be modified, when the callback is needed,
+	  the HAL_GPIO_EXTI_Callback could be implemented in the user file
+	*/
+
+	if(ENDSTOP_1_Pin == GPIO_Pin)
+	{
+		if(HAL_GPIO_ReadPin(ENDSTOP_1_GPIO_Port, ENDSTOP_1_Pin))
+		{
+			TIM3->CCR1 = 300;
+		}
+		else {
+			TIM3->CCR1 = 600;
+		}
+	}
 }
 
 /**
