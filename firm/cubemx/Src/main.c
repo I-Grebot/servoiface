@@ -64,8 +64,12 @@ osSemaphoreId selfTestSemHandle;
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
+int zero_is_found = 0;
+int speed_done = 0;
+int slow_done = 0;
 int pwm=0;
 int16_t encoder_counter=0;
+int sens_pwm=0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -120,11 +124,13 @@ int main(void)
 
   HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_R_Pin|LED_G_Pin, GPIO_PIN_SET);
   HAL_GPIO_WritePin(GPIOA, LED_B_Pin, GPIO_PIN_RESET);
+//  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1|TIM_CHANNEL_2);
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
-   TIM3->CCR1 = 300;
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
+   TIM3->CCR1 = 600;
    TIM3->CCR2 = 0;
 
-  HAL_TIM_Encoder_Start(&htim2,TIM_CHANNEL_1);
+  HAL_TIM_Encoder_Start(&htim2,TIM_CHANNEL_1|TIM_CHANNEL_2);
 
 
 
@@ -179,7 +185,6 @@ int main(void)
   while (1)
   {
   /* USER CODE END WHILE */
-	  encoder_counter = TIM2->CNT;
   /* USER CODE BEGIN 3 */
 
   }
@@ -336,10 +341,10 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 0;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 0;
+  htim2.Init.Period = 1024;//0;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  sConfig.EncoderMode = TIM_ENCODERMODE_TI1;
+  sConfig.EncoderMode = TIM_ENCODERMODE_TI12;
   sConfig.IC1Polarity = TIM_ICPOLARITY_RISING;
   sConfig.IC1Selection = TIM_ICSELECTION_DIRECTTI;
   sConfig.IC1Prescaler = TIM_ICPSC_DIV1;
@@ -488,8 +493,58 @@ void MotorCtrlTask(void const * argument)
   /* Infinite loop */
   for(;;)
   {
+	  if(zero_is_found == 1 && speed_done == 0)
+	  {
+		  TIM3->CCR1 = 0;
+		  TIM3->CCR2 = 600;
+		  osDelay(2500);
+		  TIM3->CCR1 = 600;
+		  TIM3->CCR2 = 0;
+		  osDelay(2000);
+		  speed_done = 1;
+	  }
+	  if(zero_is_found == 1 && speed_done == 1 && slow_done == 0)
+	  {
+		  TIM3->CCR1 = 0;
+		  TIM3->CCR2 = 400;
+		  osDelay(2000);
+		  TIM3->CCR1 = 400;
+		  TIM3->CCR2 = 0;
+		  osDelay(1500);
+		  slow_done= 1;
+		  TIM3->CCR1 = 0;
+		  TIM3->CCR2 = 0;
+		  osDelay(4500);
+	  }
+	  if(zero_is_found == 1 && speed_done == 1 && slow_done == 1)
+	  {
+		  zero_is_found = 0;
+		  speed_done = 0;
+		  slow_done = 0;
+		  TIM3->CCR1 = 600;
+		  TIM3->CCR2 = 0;
+	  }
+
+
+
+
+
 	  //encoder_counter = TIM_GetCounter(TIM2) ;
-	  encoder_counter = TIM2->CNT;
+//	  encoder_counter = TIM2->CNT;
+//	  if(encoder_counter > 1000) {
+//		  if(sens_pwm == 0) {
+//			TIM3->CCR1 = 0;
+//			TIM3->CCR2 = 300;
+//			sens_pwm = 1;
+//		  }
+//	  }
+//	  else if (encoder_counter < 20) {
+//		  if(sens_pwm == 1) {
+//			TIM3->CCR1 = 300;
+//			TIM3->CCR2 = 0;
+//			sens_pwm = 0;
+//		  }
+//	  }
 //	if(HAL_GPIO_ReadPin(ENDSTOP_1_GPIO_Port, ENDSTOP_1_Pin))
 //	{
 //		TIM3->CCR1 = 300;
@@ -559,12 +614,15 @@ __weak void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 
 	if(ENDSTOP_1_Pin == GPIO_Pin)
 	{
-		if(HAL_GPIO_ReadPin(ENDSTOP_1_GPIO_Port, ENDSTOP_1_Pin))
+		if(HAL_GPIO_ReadPin(ENDSTOP_1_GPIO_Port, ENDSTOP_1_Pin) == 0 && zero_is_found == 0)
 		{
-			TIM3->CCR1 = 300;
+			TIM3->CCR1 = 0;
+			TIM3->CCR2 = 0;
+			zero_is_found = 1;
 		}
 		else {
-			TIM3->CCR1 = 600;
+//		   TIM3->CCR1 = 0;
+//		   TIM3->CCR2 = 600;
 		}
 	}
 }
