@@ -495,22 +495,37 @@ void MotorCtrlTask(void const * argument)
   {
 	  if(zero_is_found == 1 && speed_done == 0)
 	  {
+		  HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_R_Pin|LED_G_Pin, GPIO_PIN_SET);
+		  HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_R_Pin, GPIO_PIN_RESET);
+
 		  TIM3->CCR1 = 0;
 		  TIM3->CCR2 = 600;
-		  osDelay(2500);
+		  osDelay(2000);
+
+		  HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_R_Pin|LED_G_Pin, GPIO_PIN_SET);
+		  HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_G_Pin, GPIO_PIN_RESET);
 		  TIM3->CCR1 = 600;
 		  TIM3->CCR2 = 0;
-		  osDelay(2000);
+		  osDelay(1400);
 		  speed_done = 1;
 	  }
 	  if(zero_is_found == 1 && speed_done == 1 && slow_done == 0)
 	  {
+		  HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_R_Pin|LED_G_Pin, GPIO_PIN_SET);
+		  HAL_GPIO_WritePin(GPIOA, LED_R_Pin|LED_G_Pin, GPIO_PIN_RESET);
+
 		  TIM3->CCR1 = 0;
 		  TIM3->CCR2 = 400;
 		  osDelay(2000);
+
+		  HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_R_Pin|LED_G_Pin, GPIO_PIN_SET);
+		  HAL_GPIO_WritePin(GPIOA, LED_R_Pin, GPIO_PIN_RESET);
 		  TIM3->CCR1 = 400;
 		  TIM3->CCR2 = 0;
 		  osDelay(1500);
+
+		  HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_R_Pin|LED_G_Pin, GPIO_PIN_SET);
+		  HAL_GPIO_WritePin(GPIOA, LED_G_Pin, GPIO_PIN_RESET);
 		  slow_done= 1;
 		  TIM3->CCR1 = 0;
 		  TIM3->CCR2 = 0;
@@ -518,6 +533,8 @@ void MotorCtrlTask(void const * argument)
 	  }
 	  if(zero_is_found == 1 && speed_done == 1 && slow_done == 1)
 	  {
+		  HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_R_Pin|LED_G_Pin, GPIO_PIN_SET);
+		  HAL_GPIO_WritePin(GPIOA, LED_B_Pin, GPIO_PIN_RESET);
 		  zero_is_found = 0;
 		  speed_done = 0;
 		  slow_done = 0;
