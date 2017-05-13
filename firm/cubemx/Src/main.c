@@ -45,6 +45,8 @@
 #include "stm32f0xx_hal.h"
 #include "cmsis_os.h"
 
+#include "ServoIface.h"
+
 /* USER CODE BEGIN Includes */
 
 /* USER CODE END Includes */
@@ -64,12 +66,12 @@ osSemaphoreId selfTestSemHandle;
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
-int zero_is_found = 0;
+//int zero_is_found = 0;
 int speed_done = 0;
 int slow_done = 0;
 int pwm=0;
-int32_t encoder_counter=0;
-int32_t encoder_0_value=0;
+//int32_t encoder_counter=0;
+//int32_t encoder_0_value=0;
 int sens_pwm=0;
 /* USER CODE END PV */
 
@@ -123,13 +125,13 @@ int main(void)
 
   /* USER CODE BEGIN 2 */
 
-  HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_R_Pin|LED_G_Pin, GPIO_PIN_SET);
-  HAL_GPIO_WritePin(GPIOA, LED_B_Pin, GPIO_PIN_RESET);
+//  HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_R_Pin|LED_G_Pin, GPIO_PIN_SET);
+//  HAL_GPIO_WritePin(GPIOA, LED_B_Pin, GPIO_PIN_RESET);
 //  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1|TIM_CHANNEL_2);
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
-   TIM3->CCR1 = 600;
-   TIM3->CCR2 = 0;
+//   TIM3->CCR1 = 600;
+//   TIM3->CCR2 = 0;
 
   HAL_TIM_Encoder_Start(&htim2,TIM_CHANNEL_1|TIM_CHANNEL_2);
 
@@ -484,141 +486,91 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-
-void GoToEncoderValue(int32_t encoder_new_value) {
-	int32_t encoder_new_value_normalized = encoder_0_value + encoder_new_value;
-
-	if(encoder_new_value_normalized > encoder_counter) {
+/**
+  * @brief Hardware function for setting the motor speed.
+  * @param speed: the new motor speed. If positive the motor will move forward, if negative it will move backward.
+  */
+void HwSetMotorSpeed(int speed) {
+	if(speed > 0) {
 		TIM3->CCR1 = 0;
-		TIM3->CCR2 = 600;
-		for(;;)
-		{
-			encoder_counter = TIM2->CNT;
-			if(encoder_new_value_normalized <= encoder_counter) {
-				TIM3->CCR1 = 0;
-				TIM3->CCR2 = 0;
-				break;
-			}
-		}
-	} else if (encoder_new_value_normalized < encoder_counter) {
-		TIM3->CCR1 = 600;
+		TIM3->CCR2 = speed;
+	} else if (speed < 0) {
+		TIM3->CCR1 = speed * -1;
 		TIM3->CCR2 = 0;
-		for(;;)
-		{
-			encoder_counter = TIM2->CNT;
-			if(encoder_new_value_normalized >= encoder_counter) {
-				TIM3->CCR1 = 0;
-				TIM3->CCR2 = 0;
-				break;
-			}
-		}
 	} else {
-
+		TIM3->CCR1 = 0;
+		TIM3->CCR2 = 0;
 	}
-
 }
 
+/**
+  * @brief Hardware function for getting the current motor position. Unit = ticks as read by the encoder.
+  */
+int32_t HwGetCurrentPosition() {
+	int32_t output = 0;
+
+	output = TIM2->CNT;
+
+	return output;
+}
+
+/**
+  * @brief Hardware function called when the goal is reached.
+  */
+void HwGoalIsReached() {
+	//TODO: code for SPI feedback when goal is reached
+
+	//LED is Green when goal is reached and motor is waiting for new instruction
+	HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_R_Pin|LED_G_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(GPIOA, LED_G_Pin, GPIO_PIN_RESET);
+}
+
+/**
+  * @brief Hardware function called when the goal is set.
+  */
+void HwGoalIsActive() {
+	//TODO: code for SPI feedback when goal is set
+
+	//LED is Blue when goal is active and motor is moving
+	HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_R_Pin|LED_G_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(GPIOA, LED_B_Pin, GPIO_PIN_RESET);
+}
 /* USER CODE END 4 */
 
 /* MotorCtrlTask function */
 void MotorCtrlTask(void const * argument)
 {
-
   /* USER CODE BEGIN 5 */
+	set_hw_set_motor_speed(HwSetMotorSpeed);
+	set_hw_get_current_position(HwGetCurrentPosition);
+	set_hw_goal_is_active(HwGoalIsActive);
+	set_hw_goal_is_reached(HwGoalIsReached);
+
   /* Infinite loop */
   for(;;)
   {
-	  if(zero_is_found == 1 && speed_done == 0)
-	  {
-		  GoToEncoderValue(3045);
-		  GoToEncoderValue(1000);
-		  GoToEncoderValue(2000);
+		//LED is Red when trying to find 0 value
+	  	HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_R_Pin|LED_G_Pin, GPIO_PIN_SET);
+	    HAL_GPIO_WritePin(GPIOA, LED_R_Pin, GPIO_PIN_RESET);
+		CheckForZero();
+		while(ZeroIsFound() == 0) {
 
-		  osDelay(4000);
+		}
+		SetObjective(3045);
+		GoToObjective();
+		SetObjective(1000);
+		GoToObjective();
+		SetObjective(2000);
+		GoToObjective();
 
-		  GoToEncoderValue(3045);
-		  GoToEncoderValue(1000);
-		  GoToEncoderValue(2000);
-		  zero_is_found = 0;
-		  TIM3->CCR1 = 600;
-		  TIM3->CCR2 = 0;
-	  }
-//	  if(zero_is_found == 1 && speed_done == 0)
-//	  {
-//		  HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_R_Pin|LED_G_Pin, GPIO_PIN_SET);
-//		  HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_R_Pin, GPIO_PIN_RESET);
-//
-//		  TIM3->CCR1 = 0;
-//		  TIM3->CCR2 = 600;
-//		  osDelay(2000);
-//
-//		  HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_R_Pin|LED_G_Pin, GPIO_PIN_SET);
-//		  HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_G_Pin, GPIO_PIN_RESET);
-//		  TIM3->CCR1 = 600;
-//		  TIM3->CCR2 = 0;
-//		  osDelay(1400);
-//		  speed_done = 1;
-//	  }
-//	  if(zero_is_found == 1 && speed_done == 1 && slow_done == 0)
-//	  {
-//		  HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_R_Pin|LED_G_Pin, GPIO_PIN_SET);
-//		  HAL_GPIO_WritePin(GPIOA, LED_R_Pin|LED_G_Pin, GPIO_PIN_RESET);
-//
-//		  TIM3->CCR1 = 0;
-//		  TIM3->CCR2 = 400;
-//		  osDelay(2000);
-//
-//		  HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_R_Pin|LED_G_Pin, GPIO_PIN_SET);
-//		  HAL_GPIO_WritePin(GPIOA, LED_R_Pin, GPIO_PIN_RESET);
-//		  TIM3->CCR1 = 400;
-//		  TIM3->CCR2 = 0;
-//		  osDelay(1500);
-//
-//		  HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_R_Pin|LED_G_Pin, GPIO_PIN_SET);
-//		  HAL_GPIO_WritePin(GPIOA, LED_G_Pin, GPIO_PIN_RESET);
-//		  slow_done= 1;
-//		  TIM3->CCR1 = 0;
-//		  TIM3->CCR2 = 0;
-//		  osDelay(4500);
-//	  }
-//	  if(zero_is_found == 1 && speed_done == 1 && slow_done == 1)
-//	  {
-//		  HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_R_Pin|LED_G_Pin, GPIO_PIN_SET);
-//		  HAL_GPIO_WritePin(GPIOA, LED_B_Pin, GPIO_PIN_RESET);
-//		  zero_is_found = 0;
-//		  speed_done = 0;
-//		  slow_done = 0;
-//		  TIM3->CCR1 = 600;
-//		  TIM3->CCR2 = 0;
-//	  }
+		osDelay(4000);
 
-
-
-
-
-	  //encoder_counter = TIM_GetCounter(TIM2) ;
-	  encoder_counter = TIM2->CNT;
-//	  if(encoder_counter > 1000) {
-//		  if(sens_pwm == 0) {
-//			TIM3->CCR1 = 0;
-//			TIM3->CCR2 = 300;
-//			sens_pwm = 1;
-//		  }
-//	  }
-//	  else if (encoder_counter < 20) {
-//		  if(sens_pwm == 1) {
-//			TIM3->CCR1 = 300;
-//			TIM3->CCR2 = 0;
-//			sens_pwm = 0;
-//		  }
-//	  }
-//	if(HAL_GPIO_ReadPin(ENDSTOP_1_GPIO_Port, ENDSTOP_1_Pin))
-//	{
-//		TIM3->CCR1 = 300;
-//	}
-//	else {
-//		TIM3->CCR1 = 600;
-//	}
+		SetObjective(3045);
+		GoToObjective();
+		SetObjective(1000);
+		GoToObjective();
+		SetObjective(2000);
+		GoToObjective();
 
     osDelay(1);
   }
@@ -632,6 +584,13 @@ void RGBLedTask(void const * argument)
   /* Infinite loop */
   for(;;)
   {
+//	  if(IsGoalActive() == 1) {
+//		  HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_R_Pin|LED_G_Pin, GPIO_PIN_SET);
+//		  HAL_GPIO_WritePin(GPIOA, LED_B_Pin, GPIO_PIN_RESET);
+//	  } else {
+//		  HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_R_Pin|LED_G_Pin, GPIO_PIN_SET);
+//		  HAL_GPIO_WritePin(GPIOA, LED_R_Pin, GPIO_PIN_RESET);
+//	  }
     osDelay(1);
   }
   /* USER CODE END RGBLedTask */
@@ -678,19 +637,9 @@ __weak void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	/* NOTE: This function should not be modified, when the callback is needed,
 	  the HAL_GPIO_EXTI_Callback could be implemented in the user file
 	*/
-
-	if(ENDSTOP_1_Pin == GPIO_Pin)
-	{
-		if(HAL_GPIO_ReadPin(ENDSTOP_1_GPIO_Port, ENDSTOP_1_Pin) == 0 && zero_is_found == 0)
-		{
-			TIM3->CCR1 = 0;
-			TIM3->CCR2 = 0;
-			encoder_0_value = TIM2->CNT;
-			zero_is_found = 1;
-		}
-		else {
-//		   TIM3->CCR1 = 0;
-//		   TIM3->CCR2 = 600;
+	if(ENDSTOP_1_Pin == GPIO_Pin) {
+		if(HAL_GPIO_ReadPin(ENDSTOP_1_GPIO_Port, ENDSTOP_1_Pin) == 0) {
+			ZeroTriggered();
 		}
 	}
 }
