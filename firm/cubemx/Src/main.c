@@ -69,10 +69,12 @@ osSemaphoreId selfTestSemHandle;
 //int zero_is_found = 0;
 int speed_done = 0;
 int slow_done = 0;
-int pwm=0;
+volatile uint32_t pwm=0;
+uint32_t debug_var = 0;
 //int32_t encoder_counter=0;
 //int32_t encoder_0_value=0;
 int sens_pwm=0;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -135,6 +137,7 @@ int main(void)
 
   HAL_TIM_Encoder_Start(&htim2,TIM_CHANNEL_1|TIM_CHANNEL_2);
 
+  HAL_TIM_IC_Start_IT(&htim1, TIM_CHANNEL_3);
 
 
   /* USER CODE END 2 */
@@ -297,7 +300,7 @@ static void MX_TIM1_Init(void)
   htim1.Instance = TIM1;
   htim1.Init.Prescaler = 0;
   htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 0;
+  htim1.Init.Period = 65535;
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim1.Init.RepetitionCounter = 0;
   htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
@@ -592,6 +595,7 @@ void RGBLedTask(void const * argument)
 //		  HAL_GPIO_WritePin(GPIOA, LED_R_Pin, GPIO_PIN_RESET);
 //	  }
     osDelay(1);
+    pwm = __HAL_TIM_GET_COMPARE(&htim1, TIM_CHANNEL_3);
   }
   /* USER CODE END RGBLedTask */
 }
@@ -629,11 +633,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 /* USER CODE END Callback 1 */
 }
 
-__weak void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-	/* Prevent unused argument(s) compilation warning */
-	UNUSED(GPIO_Pin);
-
 	/* NOTE: This function should not be modified, when the callback is needed,
 	  the HAL_GPIO_EXTI_Callback could be implemented in the user file
 	*/
