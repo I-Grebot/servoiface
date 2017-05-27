@@ -450,18 +450,24 @@ static void MX_GPIO_Init(void)
   GPIO_InitTypeDef GPIO_InitStruct;
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOF_CLK_ENABLE();
-  __HAL_RCC_GPIOA_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, LED_G_Pin|LED_B_Pin|LED_R_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : ENDSTOP_2_Pin */
   GPIO_InitStruct.Pin = ENDSTOP_2_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT; // GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(ENDSTOP_2_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : CMD_IN_Pin */
+  GPIO_InitStruct.Pin = CMD_IN_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(CMD_IN_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : SW1_Pin */
   GPIO_InitStruct.Pin = SW1_Pin;
@@ -517,6 +523,12 @@ int32_t HwGetCurrentPosition() {
 	return output;
 }
 
+uint8_t HwGetCommand(void)
+{
+  return (((HAL_GPIO_ReadPin(CMD_IN_GPIO_Port,    CMD_IN_Pin)    == GPIO_PIN_SET?1:0) << 1U) |
+          ((HAL_GPIO_ReadPin(ENDSTOP_2_GPIO_Port, ENDSTOP_2_Pin) == GPIO_PIN_SET?1:0) << 0U));
+}
+
 /**
   * @brief Hardware function called when the goal is reached.
   */
@@ -524,8 +536,8 @@ void HwGoalIsReached() {
 	//TODO: code for SPI feedback when goal is reached
 
 	//LED is Green when goal is reached and motor is waiting for new instruction
-	HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_R_Pin|LED_G_Pin, GPIO_PIN_SET);
-	HAL_GPIO_WritePin(GPIOA, LED_G_Pin, GPIO_PIN_RESET);
+	//HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_R_Pin|LED_G_Pin, GPIO_PIN_SET);
+	//HAL_GPIO_WritePin(GPIOA, LED_G_Pin, GPIO_PIN_RESET);
 }
 
 /**
@@ -535,8 +547,8 @@ void HwGoalIsActive() {
 	//TODO: code for SPI feedback when goal is set
 
 	//LED is Blue when goal is active and motor is moving
-	HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_R_Pin|LED_G_Pin, GPIO_PIN_SET);
-	HAL_GPIO_WritePin(GPIOA, LED_B_Pin, GPIO_PIN_RESET);
+	//HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_R_Pin|LED_G_Pin, GPIO_PIN_SET);
+	//HAL_GPIO_WritePin(GPIOA, LED_B_Pin, GPIO_PIN_RESET);
 }
 /* USER CODE END 4 */
 
@@ -544,39 +556,75 @@ void HwGoalIsActive() {
 void MotorCtrlTask(void const * argument)
 {
   /* USER CODE BEGIN 5 */
+
+  uint8_t command ;
+  uint8_t prev_command;
+  bool initialized = false; // prevent over-run if not init
+
 	set_hw_set_motor_speed(HwSetMotorSpeed);
 	set_hw_get_current_position(HwGetCurrentPosition);
 	set_hw_goal_is_active(HwGoalIsActive);
 	set_hw_goal_is_reached(HwGoalIsReached);
 
+	command = CMD_NOP;
+	prev_command = CMD_NOP;
+
   /* Infinite loop */
   for(;;)
   {
-		//LED is Red when trying to find 0 value
-	  	HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_R_Pin|LED_G_Pin, GPIO_PIN_SET);
-	    HAL_GPIO_WritePin(GPIOA, LED_R_Pin, GPIO_PIN_RESET);
-		CheckForZero();
-		while(ZeroIsFound() == 0) {
 
-		}
-		SetObjective(3045);
-		GoToObjective();
-		SetObjective(1000);
-		GoToObjective();
-		SetObjective(2000);
-		GoToObjective();
+    command = HwGetCommand();
 
-		osDelay(4000);
+    // Take action only on command changes
+    if(prev_command != command)
+    {
+      switch(command)
+      {
 
-		SetObjective(3045);
-		GoToObjective();
-		SetObjective(1000);
-		GoToObjective();
-		SetObjective(2000);
-		GoToObjective();
+        // Goto Left + Init
+        case CMD_GOTO_LEFT:
+          LED_YELLOW;
+          CheckForZero();
+          while(ZeroIsFound() == 0); // wait for endstop trigger
+          initialized = true;
+          LED_GREEN;
+          break;
 
-    osDelay(1);
+        case CMD_GOTO_MIDDLE:
+          if(initialized)
+          {
+            LED_CYAN;
+            SetObjective(POS_MIDDLE);
+            GoToObjective();
+            LED_GREEN;
+          }
+
+          break;
+
+        case CMD_GOTO_RIGHT:
+          if(initialized)
+          {
+            LED_MAGENTA;
+            SetObjective(POS_RIGHT);
+            GoToObjective();
+            LED_GREEN;
+          }
+          break;
+
+        default:
+          case CMD_NOP:
+            LED_OFF;
+            break;
+      }
+    } // if (command change)
+
+    prev_command = command;
+
+    // Delay in ms
+    osDelay(10);
+
   }
+
   /* USER CODE END 5 */ 
 }
 
@@ -656,6 +704,7 @@ void Error_Handler(void)
   /* User can add his own implementation to report the HAL error return state */
   while(1) 
   {
+    LED_RED;
   }
   /* USER CODE END Error_Handler */ 
 }

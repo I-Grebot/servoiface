@@ -45,6 +45,9 @@
 #define __MAIN_H
   /* Includes ------------------------------------------------------------------*/
 
+#include <stdint.h>
+#include <stdbool.h>
+
 /* USER CODE BEGIN Includes */
 
 /* USER CODE END Includes */
@@ -80,7 +83,39 @@
 #define CMD_IN_Pin GPIO_PIN_10
 #define CMD_IN_GPIO_Port GPIOA
 
+// Macros
+
+#define LEDR_WR(_v) {HAL_GPIO_WritePin(GPIOA, LED_R_Pin, (_v));}
+#define LEDG_WR(_v) {HAL_GPIO_WritePin(GPIOA, LED_G_Pin, (_v));}
+#define LEDB_WR(_v) {HAL_GPIO_WritePin(GPIOA, LED_B_Pin, (_v));}
+
+// Leds
+#define LEDx_ON   GPIO_PIN_RESET
+#define LEDx_OFF  GPIO_PIN_SET
+
+#define LED_WHITE   {LEDR_WR(LEDx_ON);  LEDG_WR(LEDx_ON);   LEDB_WR(LEDx_ON) ;}
+#define LED_RED     {LEDR_WR(LEDx_ON);  LEDG_WR(LEDx_OFF);  LEDB_WR(LEDx_OFF);}
+#define LED_GREEN   {LEDR_WR(LEDx_OFF); LEDG_WR(LEDx_ON);   LEDB_WR(LEDx_OFF);}
+#define LED_BLUE    {LEDR_WR(LEDx_OFF); LEDG_WR(LEDx_OFF);  LEDB_WR(LEDx_ON) ;}
+#define LED_CYAN    {LEDR_WR(LEDx_OFF); LEDG_WR(LEDx_ON);   LEDB_WR(LEDx_ON) ;}
+#define LED_YELLOW  {LEDR_WR(LEDx_ON);  LEDG_WR(LEDx_ON);   LEDB_WR(LEDx_OFF);}
+#define LED_MAGENTA {LEDR_WR(LEDx_ON);  LEDG_WR(LEDx_OFF);  LEDB_WR(LEDx_ON) ;}
+#define LED_OFF     {LEDR_WR(LEDx_OFF); LEDG_WR(LEDx_OFF);  LEDB_WR(LEDx_OFF);}
+
+// Commands
+#define CMD_NOP           3U  // matches default GPIO config with a pull-down
+#define CMD_GOTO_RIGHT    2U
+#define CMD_GOTO_MIDDLE   1U
+#define CMD_GOTO_LEFT     0U  // also triggers auto init with endstop 1
+
+// Objective positions
+#define POS_LEFT     -200 // to ensure that we reach the endstop
+#define POS_MIDDLE   1500
+#define POS_RIGHT    3200
+
 /* USER CODE BEGIN Private defines */
+
+uint8_t HwGetCommand(void);
 
 /* USER CODE END Private defines */
 
