@@ -127,13 +127,9 @@ int main(void)
 
   /* USER CODE BEGIN 2 */
 
-//  HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_R_Pin|LED_G_Pin, GPIO_PIN_SET);
-//  HAL_GPIO_WritePin(GPIOA, LED_B_Pin, GPIO_PIN_RESET);
-//  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1|TIM_CHANNEL_2);
+
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
-//   TIM3->CCR1 = 600;
-//   TIM3->CCR2 = 0;
 
   HAL_TIM_Encoder_Start(&htim2,TIM_CHANNEL_1|TIM_CHANNEL_2);
 
@@ -165,7 +161,7 @@ int main(void)
   MotorCtrlTaskIdHandle = osThreadCreate(osThread(MotorCtrlTaskId), NULL);
 
   /* definition and creation of RGBLedTaskId */
-  osThreadDef(RGBLedTaskId, RGBLedTask, osPriorityLow, 0, 128);
+  osThreadDef(RGBLedTaskId, RGBLedTask, osPriorityNormal, 0, 128);
   RGBLedTaskIdHandle = osThreadCreate(osThread(RGBLedTaskId), NULL);
 
   /* definition and creation of AutoTestTaskId */
@@ -384,7 +380,7 @@ static void MX_TIM3_Init(void)
   htim3.Instance = TIM3;
   htim3.Init.Prescaler = (uint16_t) (SystemCoreClock / 21000000) - 1;//0;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 1024;//0;
+  htim3.Init.Period = 1024;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_PWM_Init(&htim3) != HAL_OK)
@@ -400,7 +396,7 @@ static void MX_TIM3_Init(void)
   }
 
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 512;//0;
+  sConfigOC.Pulse = 512;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
@@ -466,7 +462,7 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin : CMD_IN_Pin */
   GPIO_InitStruct.Pin = CMD_IN_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(CMD_IN_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : SW1_Pin */
@@ -535,9 +531,6 @@ uint8_t HwGetCommand(void)
 void HwGoalIsReached() {
 	//TODO: code for SPI feedback when goal is reached
 
-	//LED is Green when goal is reached and motor is waiting for new instruction
-	//HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_R_Pin|LED_G_Pin, GPIO_PIN_SET);
-	//HAL_GPIO_WritePin(GPIOA, LED_G_Pin, GPIO_PIN_RESET);
 }
 
 /**
@@ -546,9 +539,6 @@ void HwGoalIsReached() {
 void HwGoalIsActive() {
 	//TODO: code for SPI feedback when goal is set
 
-	//LED is Blue when goal is active and motor is moving
-	//HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_R_Pin|LED_G_Pin, GPIO_PIN_SET);
-	//HAL_GPIO_WritePin(GPIOA, LED_B_Pin, GPIO_PIN_RESET);
 }
 /* USER CODE END 4 */
 
@@ -569,6 +559,18 @@ void MotorCtrlTask(void const * argument)
 	command = CMD_NOP;
 	prev_command = CMD_NOP;
 
+
+  for(;;)
+  {
+	  LED_YELLOW;
+	  osDelay(2000);
+	  LED_MAGENTA;
+	  osDelay(2000);
+	  LED_RED;
+	  osDelay(2000);
+	  LED_OFF;
+	  osDelay(2000);
+  }
   /* Infinite loop */
   for(;;)
   {
@@ -613,7 +615,7 @@ void MotorCtrlTask(void const * argument)
 
         default:
           case CMD_NOP:
-            LED_OFF;
+            LED_BLUE;
             break;
       }
     } // if (command change)
@@ -631,19 +633,41 @@ void MotorCtrlTask(void const * argument)
 /* RGBLedTask function */
 void RGBLedTask(void const * argument)
 {
+  GPIO_PinState LED_R_Pin_state;
+  GPIO_PinState LED_G_Pin_state;
+  GPIO_PinState LED_B_Pin_state;
   /* USER CODE BEGIN RGBLedTask */
   /* Infinite loop */
+  /*Just toggle LEDs*/
   for(;;)
   {
-//	  if(IsGoalActive() == 1) {
-//		  HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_R_Pin|LED_G_Pin, GPIO_PIN_SET);
-//		  HAL_GPIO_WritePin(GPIOA, LED_B_Pin, GPIO_PIN_RESET);
-//	  } else {
-//		  HAL_GPIO_WritePin(GPIOA, LED_B_Pin|LED_R_Pin|LED_G_Pin, GPIO_PIN_SET);
-//		  HAL_GPIO_WritePin(GPIOA, LED_R_Pin, GPIO_PIN_RESET);
-//	  }
-    osDelay(1);
-    pwm = __HAL_TIM_GET_COMPARE(&htim1, TIM_CHANNEL_3);
+	/*Save LEDs state*/
+	LED_R_Pin_state = HAL_GPIO_ReadPin(GPIOA,LED_R_Pin);
+	LED_G_Pin_state = HAL_GPIO_ReadPin(GPIOA,LED_G_Pin);
+	LED_B_Pin_state = HAL_GPIO_ReadPin(GPIOA,LED_B_Pin);
+	/*Shutdown all LEDs*/
+	LED_OFF;
+    osDelay(200);
+    if(LED_R_Pin_state==0)
+	{
+    	HAL_GPIO_TogglePin(GPIOA,LED_R_Pin);
+	}
+    if(LED_G_Pin_state==0)
+	{
+    	HAL_GPIO_TogglePin(GPIOA,LED_G_Pin);
+	}
+    if(LED_B_Pin_state==0)
+	{
+    	HAL_GPIO_TogglePin(GPIOA,LED_B_Pin);
+	}
+
+    /*Apply old state*/
+    HAL_GPIO_WritePin(GPIOA, LED_R_Pin, LED_R_Pin_state);
+    /*HAL_GPIO_WritePin(GPIOA, LED_G_Pin, LED_G_Pin_state);
+    HAL_GPIO_WritePin(GPIOA, LED_B_Pin, LED_B_Pin_state);*/
+    osDelay(200);
+
+    pwm = __HAL_TIM_GET_COMPARE(&htim1, TIM_CHANNEL_3);//XXX
   }
   /* USER CODE END RGBLedTask */
 }
@@ -655,7 +679,7 @@ void AutoTestTask(void const * argument)
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+    osDelay(100);
   }
   /* USER CODE END AutoTestTask */
 }
