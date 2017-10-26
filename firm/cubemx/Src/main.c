@@ -45,9 +45,11 @@
 #include "stm32f0xx_hal.h"
 #include "cmsis_os.h"
 
-#include "ServoIface.h"
+
 
 /* USER CODE BEGIN Includes */
+#include "ServoIface.h"
+#include "pid.h"
 
 /* USER CODE END Includes */
 
@@ -66,14 +68,9 @@ osSemaphoreId selfTestSemHandle;
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
-//int zero_is_found = 0;
-int speed_done = 0;
-int slow_done = 0;
+PID_process_t *pPID;
 volatile uint32_t pwm=0;
-uint32_t debug_var = 0;
-//int32_t encoder_counter=0;
-//int32_t encoder_0_value=0;
-int sens_pwm=0;
+
 
 /* USER CODE END PV */
 
@@ -88,7 +85,7 @@ static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
 void MotorCtrlTask(void const * argument);
 void RGBLedTask(void const * argument);
-void AutoTestTask(void const * argument);
+void PIDTask(void const * argument);
 
 void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
                                 
@@ -130,11 +127,13 @@ int main(void)
 
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
-
   HAL_TIM_Encoder_Start(&htim2,TIM_CHANNEL_1|TIM_CHANNEL_2);
-
   HAL_TIM_IC_Start_IT(&htim1, TIM_CHANNEL_3);
 
+  /*Init PID library*/
+  pPID = pid_init(); //position PID
+  PID_Set_Coefficient(pPID->PID,1,0,0,0); // KP, KI, KD, Ilimit
+  PID_Set_limitation(pPID,1024,0);
 
   /* USER CODE END 2 */
 
@@ -165,7 +164,7 @@ int main(void)
   RGBLedTaskIdHandle = osThreadCreate(osThread(RGBLedTaskId), NULL);
 
   /* definition and creation of AutoTestTaskId */
-  osThreadDef(AutoTestTaskId, AutoTestTask, osPriorityIdle, 0, 128);
+  osThreadDef(AutoTestTaskId, PIDTask, osPriorityIdle, 0, 128);
   AutoTestTaskIdHandle = osThreadCreate(osThread(AutoTestTaskId), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
@@ -380,7 +379,7 @@ static void MX_TIM3_Init(void)
   htim3.Instance = TIM3;
   htim3.Init.Prescaler = (uint16_t) (SystemCoreClock / 21000000) - 1;//0;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 1024;
+  htim3.Init.Period = MOTOR_PWM_PERIOD;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_PWM_Init(&htim3) != HAL_OK)
@@ -396,7 +395,7 @@ static void MX_TIM3_Init(void)
   }
 
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 512;
+  sConfigOC.Pulse = MOTOR_PWM_PERIOD / 2; // 50%
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
@@ -496,6 +495,16 @@ static void MX_GPIO_Init(void)
   * @param speed: the new motor speed. If positive the motor will move forward, if negative it will move backward.
   */
 void HwSetMotorSpeed(int speed) {
+	/*Check if PWM is out of range*/
+	if(speed > MOTOR_PWM_PERIOD)
+	{
+		speed = MOTOR_PWM_PERIOD;
+	}else if(speed < (-MOTOR_PWM_PERIOD) )
+	{
+		speed = -MOTOR_PWM_PERIOD;
+	}
+
+	/*Apply PWM upon speed sign*/
 	if(speed > 0) {
 		TIM3->CCR1 = 0;
 		TIM3->CCR2 = speed;
@@ -563,13 +572,13 @@ void MotorCtrlTask(void const * argument)
   for(;;)
   {
 	  LED_YELLOW;
-	  osDelay(2000);
+	  osDelay(1000);
+	  PID_Set_Ref_Position(pPID,1000);
 	  LED_MAGENTA;
-	  osDelay(2000);
-	  LED_RED;
-	  osDelay(2000);
-	  LED_OFF;
-	  osDelay(2000);
+	  osDelay(5000);
+	  PID_Set_Ref_Position(pPID,-2000);
+	  LED_BLUE;
+	  osDelay(5000);
   }
   /* Infinite loop */
   for(;;)
@@ -661,27 +670,27 @@ void RGBLedTask(void const * argument)
     	HAL_GPIO_TogglePin(GPIOA,LED_B_Pin);
 	}
 
-    /*Apply old state*/
-    HAL_GPIO_WritePin(GPIOA, LED_R_Pin, LED_R_Pin_state);
-    /*HAL_GPIO_WritePin(GPIOA, LED_G_Pin, LED_G_Pin_state);
-    HAL_GPIO_WritePin(GPIOA, LED_B_Pin, LED_B_Pin_state);*/
-    osDelay(200);
-
     pwm = __HAL_TIM_GET_COMPARE(&htim1, TIM_CHANNEL_3);//XXX
   }
   /* USER CODE END RGBLedTask */
 }
 
-/* AutoTestTask function */
-void AutoTestTask(void const * argument)
+/* PIDTask function */
+void PIDTask(void const * argument)
 {
-  /* USER CODE BEGIN AutoTestTask */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(100);
-  }
-  /* USER CODE END AutoTestTask */
+	uint32_t PreviousWakeTime = osKernelSysTick();
+	int32_t i32CurPos=0;
+	/* USER CODE BEGIN PIDTask */
+	/* Infinite loop */
+	for(;;)
+	{
+		/*Ensure constant time base*/
+		osDelayUntil(&PreviousWakeTime,1);
+		i32CurPos = GetCurrentPosition();
+		PID_Process_Position(pPID, NULL, i32CurPos);
+
+	}
+	/* USER CODE END PIDTask */
 }
 
 /**
