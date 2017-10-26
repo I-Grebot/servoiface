@@ -113,9 +113,6 @@
 #define POS_MIDDLE   1500
 #define POS_RIGHT    3200
 
-// PWM
-#define MOTOR_PWM_PERIOD 1024 // PWM Timer period
-
 /* USER CODE BEGIN Private defines */
 
 uint8_t HwGetCommand(void);

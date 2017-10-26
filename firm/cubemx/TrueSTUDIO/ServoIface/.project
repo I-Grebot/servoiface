@@ -137,11 +137,6 @@
 			<locationURI>PARENT-2-PROJECT_LOC/Src/main.c</locationURI>
 		</link>
 		<link>
-			<name>Application/User/pid.c</name>
-			<type>1</type>
-			<locationURI>PARENT-2-PROJECT_LOC/Src/pid.c</locationURI>
-		</link>
-		<link>
 			<name>Application/User/stm32f0xx_hal_msp.c</name>
 			<type>1</type>
 			<locationURI>PARENT-2-PROJECT_LOC/Src/stm32f0xx_hal_msp.c</locationURI>
