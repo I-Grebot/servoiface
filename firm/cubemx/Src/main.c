@@ -132,7 +132,7 @@ int main(void)
 
   /*Init PID library*/
   pPID = pid_init(); //position PID
-  PID_Set_Coefficient(pPID->PID,1,0,0,0); // KP, KI, KD, Ilimit
+  PID_Set_Coefficient(pPID->PID,50,1,260,0); // KP, KI, KD, Ilimit
   PID_Set_limitation(pPID,1024,0);
 
   /* USER CODE END 2 */
@@ -573,12 +573,15 @@ void MotorCtrlTask(void const * argument)
   {
 	  LED_YELLOW;
 	  osDelay(1000);
-	  PID_Set_Ref_Position(pPID,1000);
+	  PID_Set_limitation(pPID,1024,0);
+	  TIM2->CNT=0;
+	  PID_Set_Ref_Position(pPID,8000);
 	  LED_MAGENTA;
-	  osDelay(5000);
-	  PID_Set_Ref_Position(pPID,-2000);
+	  osDelay(2000);
+	  PID_Set_limitation(pPID,150,0);
+	  PID_Set_Ref_Position(pPID,0);
 	  LED_BLUE;
-	  osDelay(5000);
+	  osDelay(2000);
   }
   /* Infinite loop */
   for(;;)
@@ -685,7 +688,7 @@ void PIDTask(void const * argument)
 	for(;;)
 	{
 		/*Ensure constant time base*/
-		osDelayUntil(&PreviousWakeTime,1);
+		osDelayUntil(&PreviousWakeTime,10);
 		i32CurPos = GetCurrentPosition();
 		PID_Process_Position(pPID, NULL, i32CurPos);
 

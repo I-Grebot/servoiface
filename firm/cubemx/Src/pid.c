@@ -34,7 +34,7 @@ int32_t PID_Process(PID_struct_t *PID, int32_t error)
     PID->last_err = PID->err;
     PID->err = error;
     PID->err_I += error;
-    err_D = PID->err - PID->last_err;
+    err_D = PID->last_err - PID->err;
 
     if(PID->KI!=0)
     {
@@ -47,7 +47,7 @@ int32_t PID_Process(PID_struct_t *PID, int32_t error)
         }
     }
     /*Main PID computation*/
-    command = PID->err*PID->KP + PID->err_I*PID->KI/100 - err_D*PID->KD;
+    command = PID->err*PID->KP/100 + PID->err_I*PID->KI/1000 - err_D*PID->KD/100;
 
     return command;
  }
