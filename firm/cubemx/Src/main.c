@@ -135,6 +135,10 @@ int main(void)
 
   HAL_TIM_IC_Start_IT(&htim1, TIM_CHANNEL_3);
 
+  /*Init PID library*/
+  pPID = pid_init(); //position PID
+  PID_Set_Coefficient(pPID->PID,50,1,260,0); // KP, KI, KD, Ilimit
+  PID_Set_limitation(pPID,1024,0);
 
   /* USER CODE END 2 */
 
@@ -563,12 +567,15 @@ void MotorCtrlTask(void const * argument)
   for(;;)
   {
 	  LED_YELLOW;
-	  osDelay(2000);
+	  osDelay(1000);
+	  PID_Set_limitation(pPID,1024,0);
+	  TIM2->CNT=0;
+	  PID_Set_Ref_Position(pPID,8000);
 	  LED_MAGENTA;
 	  osDelay(2000);
-	  LED_RED;
-	  osDelay(2000);
-	  LED_OFF;
+	  PID_Set_limitation(pPID,150,0);
+	  PID_Set_Ref_Position(pPID,0);
+	  LED_BLUE;
 	  osDelay(2000);
   }
   /* Infinite loop */
@@ -675,13 +682,19 @@ void RGBLedTask(void const * argument)
 /* AutoTestTask function */
 void AutoTestTask(void const * argument)
 {
-  /* USER CODE BEGIN AutoTestTask */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(100);
-  }
-  /* USER CODE END AutoTestTask */
+	uint32_t PreviousWakeTime = osKernelSysTick();
+	int32_t i32CurPos=0;
+	/* USER CODE BEGIN PIDTask */
+	/* Infinite loop */
+	for(;;)
+	{
+		/*Ensure constant time base*/
+		osDelayUntil(&PreviousWakeTime,10);
+		i32CurPos = GetCurrentPosition();
+		PID_Process_Position(pPID, NULL, i32CurPos);
+
+	}
+	/* USER CODE END PIDTask */
 }
 
 /**
