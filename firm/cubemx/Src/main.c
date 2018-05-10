@@ -44,7 +44,7 @@
 #include "main.h"
 #include "stm32f0xx_hal.h"
 #include "cmsis_os.h"
-
+#include "pid.h"
 #include "ServoIface.h"
 
 /* USER CODE BEGIN Includes */
@@ -69,11 +69,9 @@ osSemaphoreId selfTestSemHandle;
 //int zero_is_found = 0;
 int speed_done = 0;
 int slow_done = 0;
-volatile uint32_t pwm=0;
 uint32_t debug_var = 0;
-//int32_t encoder_counter=0;
-//int32_t encoder_0_value=0;
-int sens_pwm=0;
+PID_process_t *pPID;
+volatile uint32_t pwm=0;
 
 /* USER CODE END PV */
 
@@ -460,7 +458,7 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin : ENDSTOP_2_Pin */
   GPIO_InitStruct.Pin = ENDSTOP_2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT; // GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(ENDSTOP_2_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : CMD_IN_Pin */
@@ -478,7 +476,7 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin : ENDSTOP_1_Pin */
   GPIO_InitStruct.Pin = ENDSTOP_1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(ENDSTOP_1_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : LED_G_Pin LED_B_Pin LED_R_Pin */
@@ -549,92 +547,70 @@ void HwGoalIsActive() {
 /* MotorCtrlTask function */
 void MotorCtrlTask(void const * argument)
 {
-  /* USER CODE BEGIN 5 */
+	/* USER CODE BEGIN 5 */
 
-  uint8_t command ;
-  uint8_t prev_command;
-  bool initialized = false; // prevent over-run if not init
+	uint8_t command ;
+	uint8_t prev_command;
+	bool initialized = false; // prevent over-run if not init
+
+	LED_RED;
 
 	set_hw_set_motor_speed(HwSetMotorSpeed);
 	set_hw_get_current_position(HwGetCurrentPosition);
 	set_hw_goal_is_active(HwGoalIsActive);
 	set_hw_goal_is_reached(HwGoalIsReached);
 
-	command = CMD_NOP;
-	prev_command = CMD_NOP;
+	SetMotorSpeed(0);
 
+	command = CMD_WAIT;
+	prev_command = CMD_WAIT;
 
-  for(;;)
-  {
-	  LED_YELLOW;
-	  osDelay(1000);
-	  PID_Set_limitation(pPID,1024,0);
-	  TIM2->CNT=0;
-	  PID_Set_Ref_Position(pPID,8000);
-	  LED_MAGENTA;
-	  osDelay(2000);
-	  PID_Set_limitation(pPID,150,0);
-	  PID_Set_Ref_Position(pPID,0);
-	  LED_BLUE;
-	  osDelay(2000);
-  }
-  /* Infinite loop */
-  for(;;)
-  {
+	/* Infinite loop */
+	for(;;)
+	{
 
-    command = HwGetCommand();
+	command = HwGetCommand();
 
-    // Take action only on command changes
-    if(prev_command != command)
-    {
-      switch(command)
-      {
+	// Take action only on command changes
+	if(prev_command != command)
+	{
+	  switch(command)
+	  {
 
-        // Goto Left + Init
-        case CMD_GOTO_LEFT:
-          LED_YELLOW;
-          CheckForZero();
-          while(ZeroIsFound() == 0); // wait for endstop trigger
-          initialized = true;
-          LED_GREEN;
-          break;
+		// Init
+		case CMD_INIT:
+			LED_YELLOW;
+			CheckForZero();
+			while(ZeroIsFound() == 0); /*wait for sensor trigger*/
+			initialized = true;
+			LED_RED;
+			PID_Set_Cur_Position(pPID,POS_RESET); /*Reset current PID position*/
+			TIM2->CNT=POS_RESET; /*Reset Timer used for encoder*/
+			PID_Set_Ref_Position(pPID,POS_RESET);
+			LED_GREEN;
+			break;
+		case CMD_SHOOT_HIGH:
+			LED_CYAN;
+			PID_Set_limitation(pPID,SPEED_FAST,0);
+			PID_Set_Ref_Position(pPID,POS_ONE_TURN);
+			break;
+		case CMD_SHOOT_LOW:
+			LED_MAGENTA;
+			PID_Set_limitation(pPID,SPEED_SLOW,0);
+			PID_Set_Ref_Position(pPID,POS_ONE_TURN);
+			break;
+		case CMD_WAIT:
+		default:
+			LED_BLUE;
+			break;
+	  }
+	} // if (command change)
+	prev_command = command;
+	// Delay in ms
+	osDelay(10);
+	}
 
-        case CMD_GOTO_MIDDLE:
-          if(initialized)
-          {
-            LED_CYAN;
-            SetObjective(POS_MIDDLE);
-            GoToObjective();
-            LED_GREEN;
-          }
-
-          break;
-
-        case CMD_GOTO_RIGHT:
-          if(initialized)
-          {
-            LED_MAGENTA;
-            SetObjective(POS_RIGHT);
-            GoToObjective();
-            LED_GREEN;
-          }
-          break;
-
-        default:
-          case CMD_NOP:
-            LED_BLUE;
-            break;
-      }
-    } // if (command change)
-
-    prev_command = command;
-
-    // Delay in ms
-    osDelay(10);
-
-  }
-
-  /* USER CODE END 5 */ 
+	/* USER CODE END 5 */
 }
 
 /* RGBLedTask function */
@@ -653,25 +629,12 @@ void RGBLedTask(void const * argument)
 	LED_G_Pin_state = HAL_GPIO_ReadPin(GPIOA,LED_G_Pin);
 	LED_B_Pin_state = HAL_GPIO_ReadPin(GPIOA,LED_B_Pin);
 	/*Shutdown all LEDs*/
-	LED_OFF;
+//	LED_OFF;
     osDelay(200);
-    if(LED_R_Pin_state==0)
-	{
-    	HAL_GPIO_TogglePin(GPIOA,LED_R_Pin);
-	}
-    if(LED_G_Pin_state==0)
-	{
-    	HAL_GPIO_TogglePin(GPIOA,LED_G_Pin);
-	}
-    if(LED_B_Pin_state==0)
-	{
-    	HAL_GPIO_TogglePin(GPIOA,LED_B_Pin);
-	}
-
     /*Apply old state*/
-    HAL_GPIO_WritePin(GPIOA, LED_R_Pin, LED_R_Pin_state);
-    /*HAL_GPIO_WritePin(GPIOA, LED_G_Pin, LED_G_Pin_state);
-    HAL_GPIO_WritePin(GPIOA, LED_B_Pin, LED_B_Pin_state);*/
+//    HAL_GPIO_WritePin(GPIOA, LED_R_Pin, LED_R_Pin_state);
+//    HAL_GPIO_WritePin(GPIOA, LED_G_Pin, LED_G_Pin_state);
+//    HAL_GPIO_WritePin(GPIOA, LED_B_Pin, LED_B_Pin_state);
     osDelay(200);
 
     pwm = __HAL_TIM_GET_COMPARE(&htim1, TIM_CHANNEL_3);//XXX
@@ -726,6 +689,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	if(ENDSTOP_1_Pin == GPIO_Pin) {
 		if(HAL_GPIO_ReadPin(ENDSTOP_1_GPIO_Port, ENDSTOP_1_Pin) == 0) {
 			ZeroTriggered();
+
 		}
 	}
 }

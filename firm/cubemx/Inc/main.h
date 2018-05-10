@@ -103,15 +103,19 @@
 #define LED_OFF     {LEDR_WR(LEDx_OFF); LEDG_WR(LEDx_OFF);  LEDB_WR(LEDx_OFF);}
 
 // Commands
-#define CMD_NOP           3U  // matches default GPIO config with a pull-down
-#define CMD_GOTO_RIGHT    2U
-#define CMD_GOTO_MIDDLE   1U
-#define CMD_GOTO_LEFT     0U  // also triggers auto init with endstop 1
+#define CMD_WAIT          0U
+#define CMD_SHOOT_HIGH    2U
+#define CMD_SHOOT_LOW     3U
+#define CMD_INIT          1U
 
 // Objective positions
-#define POS_LEFT     -200 // to ensure that we reach the endstop
-#define POS_MIDDLE   1500
-#define POS_RIGHT    3200
+#define POS_RESET     100
+#define POS_ONE_TURN  8000
+
+// Objective speeds
+#define SPEED_FAST  1023
+#define SPEED_SLOW  700
+#define SPEED_INIT -200
 
 /* USER CODE BEGIN Private defines */
 

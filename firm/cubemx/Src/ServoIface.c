@@ -156,7 +156,7 @@ int IsGoalActive() {
   */
 void CheckForZero() {
 	zero_is_found = 0;
-	SetMotorSpeed(-600);
+	SetMotorSpeed(SPEED_INIT);
 }
 
 /**
