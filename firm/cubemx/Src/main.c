@@ -562,7 +562,7 @@ void MotorCtrlTask(void const * argument)
 
 	SetMotorSpeed(0);
 
-	command = CMD_WAIT;
+	command = CMD_INIT;
 	prev_command = CMD_WAIT;
 
 	/* Infinite loop */

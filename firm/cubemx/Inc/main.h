@@ -114,7 +114,7 @@
 
 // Objective speeds
 #define SPEED_FAST  1023
-#define SPEED_SLOW  700
+#define SPEED_SLOW  300
 #define SPEED_INIT -200
 
 /* USER CODE BEGIN Private defines */
